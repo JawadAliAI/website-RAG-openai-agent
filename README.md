@@ -2,7 +2,7 @@
 
 A FastAPI-based intelligent assistant that answers questions using a vector store. Powered by OpenAI agent tools with a simple frontend.
 
-![1751824004978](image/README/1751824004978.png)
+![1751824004978](1751824004978.png)
 
 ## Features
 
