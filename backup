@@ -1,0 +1,60 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from agents import Agent, Runner, FileSearchTool
+from dotenv import load_dotenv
+load_dotenv()
+
+# -----------------------------------------------------------------------------
+# Agent setup (done once at startup so we don’t re‑create it on every request)
+# -----------------------------------------------------------------------------
+file_search_tool = FileSearchTool(
+    max_num_results=5,
+    vector_store_ids=["vs_6868f43e68b48191905129c5a089c159"],
+)
+
+assistant_agent = Agent(
+    name="Assistant",
+    instructions=(
+        "You're a helpful assistant. Use *only* the provided vector store to find the information. "
+        "If you can’t find the answer, simply reply with 'I don't know'."
+    ),
+    tools=[file_search_tool],
+)
+
+# -----------------------------------------------------------------------------
+# FastAPI application
+# -----------------------------------------------------------------------------
+app = FastAPI(
+    title="BackAware Benefits Assistant API",
+    description="Ask questions about BackAware benefits via a simple JSON interface.",
+    version="1.0.0",
+)
+
+
+class QueryRequest(BaseModel):
+    """Schema for the incoming user query."""
+
+    query: str
+
+
+class QueryResponse(BaseModel):
+    """Schema for the Agent’s answer returned to the client."""
+
+    answer: str
+
+
+@app.get("/", tags=["healthcheck"])
+def root() -> dict[str, str]:
+    """Basic health‑check route."""
+
+    return {"status": "ok"}
+
+
+@app.post("/ask", response_model=QueryResponse, tags=["qa"])
+async def ask_question(req: QueryRequest) -> QueryResponse:
+    """Forward the user’s query to the Agent and return its answer."""
+    try:
+        result = await Runner.run(assistant_agent, req.query)
+        return QueryResponse(answer=result.final_output)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
